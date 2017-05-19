@@ -15,6 +15,25 @@ pub struct IntervalSet {
     intervals: Vec<Interval>
 }
 
+/// Struct to iterate through an `IntervalSet`
+pub struct IntervalSetIterator<'a> {
+    pos: usize,
+    inner: &'a IntervalSet
+}
+
+impl<'a> Iterator for IntervalSetIterator<'a> {
+    type Item = &'a Interval;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.inner.intervals.len() {
+            None
+        } else {
+            self.pos += 1;
+            self.inner.intervals.get(self.pos - 1)
+        }
+    }
+}
+
 impl Interval {
 
     pub fn new(begin: u32,end: u32) -> Interval {
@@ -28,6 +47,27 @@ impl Interval {
     /// Return the maximum interval possible (with u32 var)
     pub fn whole() -> Interval {
         Interval(u32::min_value(), u32::max_value())
+    }
+
+    /// Because Order is needed to sort the IntervalSet I dont what to change the
+    /// native order. This function coud be considered as the `len` of the interval.
+    pub fn range_size() {
+        self.1 - self.0
+    }
+
+    /// Simply return an equivalent interval as tuple.
+    pub fn as_tuple(&self) -> (u32, u32) {
+        (self.0, self.1)
+    }
+
+    /// I am not sure about those two function, maybe set the field as public could be a better
+    /// idea...
+    pub fn get_inf(&self) -> u32 {
+        self.0
+    }
+
+    pub fn get_sup(&self) -> u32 {
+        self.1
     }
 
     /// Utility function check if the interval is valid.
@@ -189,6 +229,85 @@ impl IntervalSet {
     /// ```
     pub fn symetric_difference(self, rhs: IntervalSet) -> IntervalSet {
         self.merge(rhs, &|a, b| -> bool {a ^ b})
+    }
+
+    /// Return the greater interval from the set.
+    /// Note that the function return a cloned interval, so I will be easier to manipulate.
+    /// Moreover, in the case where many intervals have the same size, the function will return the first element.
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    /// use interval_set::interval_set::IntervalSet;
+    /// use interval_set::interval_set::Interval;
+    ///
+    /// let a = vec![(5, 10), (15, 25)].to_interval_set();
+    /// let b = vec![(5, 10), (15, 20)].to_interval_set();
+    /// let c = vec![(5, 10), (15, 20), (100, 1000)].to_interval_set();
+    ///
+    /// assert_eq!(a.max().unwrap(), Interval::new(15, 25));
+    /// assert_eq!(b.max().unwrap(), Interval::new(5, 10));
+    /// assert_eq!(c.max().unwrap(), Interval::new(100, 1000));
+    /// assert_eq!(IntervalSet::empty().max(), None);
+    ///
+    /// ```
+    pub fn max(&self) -> Option<Interval> {
+        let mut max = usize::min_value();
+        let mut res = None;
+
+        if self.is_empty() {
+            return None;
+        }
+
+        for intv in self.iter() {
+            let curr_: usize = (intv.1 - intv.0) as usize;
+            if curr_  > max {
+                max = curr_ as usize;
+                res = Some(intv.clone());
+            }
+        }
+        res
+    }
+
+    /// Return the size of the interval set. The sie is defined by the sum of the len of each
+    /// intervals contained into the set.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    ///
+    /// let a = vec![(5, 10), (15, 20)].to_interval_set();
+    /// let b = vec![(0, 10), (15, 20)].to_interval_set();
+    /// assert_eq!(a.size(), 10);
+    /// assert_eq!(b.size(), 15);
+    /// ```
+     pub fn size(&self) -> u32 {
+        if self.is_empty() {
+            return 0;
+        }
+        self.iter().fold(0, |acc, ref x| acc + (x.1 - x.0))
+    }
+
+    /// Get an iterator over an IntervalSet
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    ///
+    /// let a = vec![(5, 10), (15, 20)].to_interval_set();
+    /// for intv in a.iter() {
+    ///     let tuple = intv.as_tuple();
+    ///     println!("{}--{}", tuple.0, tuple.1);
+    /// }
+    ///
+    /// ```
+    pub fn iter<'a>(&'a self) -> IntervalSetIterator<'a> {
+        IntervalSetIterator {
+            inner: self,
+            pos: 0,
+        }
     }
 
     /// Generate the (flat) list of interval bounds of the requested merge.
