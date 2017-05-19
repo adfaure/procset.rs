@@ -5,7 +5,7 @@ use std::cmp;
 ///
 /// The `Interval` is incluse which means that `Interval(0, 10)` is [0, 10].
 /// The value 0 is supposed to be equals or greater than the second value.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Interval(u32, u32);
 
 /// Struct `IntervalSet` representing a set of sorted not overllaping intervals.
@@ -84,14 +84,14 @@ impl ToIntervalSet for Vec<Interval> {
     /// vec![Interval::new(5, 10), Interval::new(15, 20)].to_interval_set();
     /// ```
     fn to_interval_set(self) -> IntervalSet {
-        for intv in &self {
+        let mut res: IntervalSet = IntervalSet::empty();
+        for intv in self {
             if !intv.is_valid() {
                 panic!("Invalid interval: {}-{}", intv.0, intv.1)
             }
+            res.insert(intv);
         }
-        IntervalSet {
-            intervals: self
-        }
+        res
     }
 }
 
@@ -106,16 +106,14 @@ impl ToIntervalSet for Vec<(u32, u32)> {
     /// vec![(5, 10), (15, 20)].to_interval_set();
     /// ```
     fn to_interval_set(self) -> IntervalSet {
-        let mut vec: Vec<Interval> = vec![];
+        let mut res: IntervalSet = IntervalSet::empty();
         for (begin, end) in self {
             if begin > end {
                 panic!("Invalid interval: {}-{}", begin, end)
             }
-            vec.push(Interval(begin, end));
+            res.insert(Interval(begin, end));
         }
-        IntervalSet {
-            intervals: vec
-        }
+        res
     }
 }
 
@@ -267,6 +265,31 @@ impl IntervalSet {
         }
        res.to_interval_set()
     }
+
+    fn insert(&mut self, element: Interval) {
+        let mut newinf = element.0;
+        let mut newsup = element.1;
+
+        // Because we may remove one interval from self while we loop through its clone, we need to
+        // adjuste the position.
+        let mut idx_shift = 0;
+        for (pos, intv) in self.intervals.clone().iter().enumerate() {
+            if newinf > intv.1 + 1 {
+                continue;
+            }
+            if newsup + 1 < intv.0 {
+                break;
+            }
+
+            self.intervals.remove(pos - idx_shift);
+            idx_shift += 1;
+
+            newinf = cmp::min(newinf, intv.0);
+            newsup = cmp::max(newsup, intv.1);
+        }
+        self.intervals.push(Interval::new(newinf, newsup));
+        self.intervals.sort();
+    }
 }
 
 impl fmt::Display for Interval {
@@ -308,6 +331,29 @@ mod tests {
         let empty_set = IntervalSet::empty();
 
         assert!(empty_from_vec.to_interval_set() == empty_set);
+    }
+
+    fn assert_insertion(tes_id: u32, a: IntervalSet, element: Interval, expected :IntervalSet) {
+        let mut a_ = a.clone();
+        a_.insert(element);
+        assert_eq!(a_, expected, "Test {} failed", tes_id);
+    }
+
+    #[test]
+    fn test_insertion() {
+         let sym_cases: Vec<(u32, IntervalSet, Interval, IntervalSet)> = vec![
+            (1, IntervalSet{ intervals: vec![Interval(0, 0)] }, Interval(1, 1) , IntervalSet{ intervals: vec![Interval(0, 1)] } ),
+            (2, IntervalSet{ intervals: vec![Interval(0, 0), Interval(2, 2)] }, Interval(1, 1), IntervalSet{ intervals: vec![Interval(0, 2)] } ),
+            (3, IntervalSet{ intervals: vec![Interval(0, 3)] }, Interval(1, 1), IntervalSet{ intervals: vec![Interval(0, 3)] } ),
+            (4, IntervalSet{ intervals: vec![Interval(1, 1)] }, Interval(0, 3), IntervalSet{ intervals: vec![Interval(0, 3)] } ),
+            (5, IntervalSet{ intervals: vec![Interval(0, 100)] }, Interval(1, 3), IntervalSet{ intervals: vec![Interval(0, 100)] } ),
+            (6, IntervalSet{ intervals: vec![Interval(10, 20)] }, Interval(40, 80), IntervalSet{ intervals: vec![Interval(10, 20), Interval::new(40, 80)] } ),
+        ];
+
+        for (id, a, element, expected) in sym_cases {
+            //assert_eq!(format!("test #{} of union", id), a, b, |x,y| x.union(y), expected);
+           assert_insertion(id, a, element, expected);
+        }
     }
 
     #[test]
@@ -384,6 +430,7 @@ mod tests {
             (4, vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set()),
             (5, vec![(0, 100)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(0, 100)].to_interval_set()),
             (6, IntervalSet::empty(), IntervalSet::empty(), IntervalSet::empty()),
+            (7, vec![(0, 0), (2, 2), (3, 3)].to_interval_set(), vec![(1, 1)].to_interval_set(), vec![(0, 3)].to_interval_set()),
         ];
 
         for (id, a, b, expected) in sym_cases {
