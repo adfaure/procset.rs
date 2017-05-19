@@ -271,17 +271,24 @@ impl IntervalSet {
 
 impl fmt::Display for Interval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{},{})", self.0, self.1)
+        if self.0 == self.1 {
+            write!(f, "{}", self.0)
+        } else {
+            write!(f, "{}-{}", self.0, self.1)
+        }
     }
 }
 
 impl fmt::Display for IntervalSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("{")?;
-        for interval in &self.intervals {
-            f.write_fmt(format_args!("{}", interval))?;
+        for (pos, interval) in self.intervals.iter().enumerate() {
+            if pos == self.intervals.len() -1 {
+                f.write_fmt(format_args!("{}", interval))?;
+            } else {
+                f.write_fmt(format_args!("{} ", interval))?;
+            }
         }
-        f.write_str("}")
+        write!(f, "")
     }
 }
 
@@ -292,7 +299,7 @@ mod tests {
     #[test]
     fn test_print() {
         let empty_set = IntervalSet::empty();
-        assert_eq!(format!("{}", empty_set), "{}");
+        assert_eq!(format!("{}", empty_set), "");
     }
 
     #[test]
