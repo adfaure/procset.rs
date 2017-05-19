@@ -325,12 +325,22 @@ mod tests {
         assert_eq!(format!("{}", empty_set), "");
     }
 
+    fn assert_to_interval_set(tes_id: u32, v: Vec<(u32, u32)>, expected :IntervalSet) {
+        assert_eq!(v.to_interval_set(), expected, "Test {} failed", tes_id);
+    }
+
     #[test]
     fn test_to_interval_set() {
-        let empty_from_vec: Vec<Interval> = vec![];
-        let empty_set = IntervalSet::empty();
+         let sym_cases = vec![
+            (1, vec![(5, 10)], IntervalSet{ intervals: vec![Interval(5, 10)] }),
+            (2, vec![(0, 100), (5, 10)], IntervalSet{ intervals: vec![Interval(0, 100)] }),
+            (3, vec![(1, 1), (2 ,2), (3, 3), (4, 10), (10, 20)], IntervalSet{ intervals: vec![Interval(1, 20)] }),
+        ];
 
-        assert!(empty_from_vec.to_interval_set() == empty_set);
+        for (id, v, expected) in sym_cases {
+            //assert_eq!(format!("test #{} of union", id), a, b, |x,y| x.union(y), expected);
+           assert_to_interval_set(id, v, expected);
+        }
     }
 
     fn assert_insertion(tes_id: u32, a: IntervalSet, element: Interval, expected :IntervalSet) {
