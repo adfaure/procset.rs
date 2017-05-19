@@ -51,7 +51,7 @@ impl Interval {
 
     /// Because Order is needed to sort the IntervalSet I dont what to change the
     /// native order. This function coud be considered as the `len` of the interval.
-    pub fn range_size() {
+    pub fn range_size(&self) -> u32 {
         self.1 - self.0
     }
 
