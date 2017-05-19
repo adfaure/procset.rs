@@ -1,43 +1,205 @@
 use std::fmt;
 use std::cmp;
 
-#[derive(Debug, Eq, PartialEq)]
+/// Struct `Interval` containing two values representing the limit of the interval.
+///
+/// The `Interval` is incluse which means that `Interval(0, 10)` is [0, 10].
+/// The value 0 is supposed to be equals or greater than the second value.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Interval(u32, u32);
 
-#[derive(Debug, Eq, PartialEq)]
+/// Struct `IntervalSet` representing a set of sorted not overllaping intervals.
+/// Be aware that the validity of the interval set is not checked.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntervalSet {
     intervals: Vec<Interval>
 }
 
 impl Interval {
+
+    pub fn new(begin: u32,end: u32) -> Interval {
+        let res = Interval(begin, end);
+        if !res.is_valid() {
+            panic!("Call constructor of Interval with invalid endpoints: Interval({}, {})", begin, end);
+        }
+        res
+    }
+
+    /// Return the maximum interval possible (with u32 var)
     pub fn whole() -> Interval {
         Interval(u32::min_value(), u32::max_value())
+    }
+
+    /// Utility function check if the interval is valid.
+    ///
+    /// # Examples
+    /// The following intervals are valids:
+    ///
+    /// ```
+    /// use interval_set::Interval;
+    /// Interval::new(0, 0);
+    /// Interval::new(10, 100);
+    /// ```
+    ///
+    /// The following intervals ae not valid:
+    ///
+    /// ```rust,should_panic
+    /// use interval_set::Interval;
+    /// Interval::new(10, 0);
+    /// ```
+    pub fn is_valid(&self) -> bool {
+        self.0 <= self.1
+    }
+}
+
+/// Trait `ToIntervalSet` allows to write a function to convert type into an IntervalSet.
+pub trait ToIntervalSet {
+    /// Consume `self` to create an IntervalSet
+    fn to_interval_set(self) -> IntervalSet;
+}
+
+impl ToIntervalSet for Interval {
+    /// Convert a simple interval into an intervalset.
+    /// Note that the validity of the interval is checked.
+    fn to_interval_set(self) -> IntervalSet {
+        if self.is_valid() {
+            IntervalSet {
+                intervals: vec![self]
+            }
+        } else {
+            panic!("CReate interval set from an unvalid interval");
+        }
+    }
+}
+
+impl ToIntervalSet for Vec<Interval> {
+    /// Convert an array of interval into an intervalset.
+    /// Note that the validity of the intervals are checked.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    /// use interval_set::Interval;
+    /// vec![Interval::new(5, 10), Interval::new(15, 20)].to_interval_set();
+    /// ```
+    fn to_interval_set(self) -> IntervalSet {
+        for intv in &self {
+            if !intv.is_valid() {
+                panic!("Invalid interval: {}-{}", intv.0, intv.1)
+            }
+        }
+        IntervalSet {
+            intervals: self
+        }
+    }
+}
+
+impl ToIntervalSet for Vec<(u32, u32)> {
+    /// Convert an array of tuples into an intervalset.
+    /// Note that the validity of the intervals are checked.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    /// vec![(5, 10), (15, 20)].to_interval_set();
+    /// ```
+    fn to_interval_set(self) -> IntervalSet {
+        let mut vec: Vec<Interval> = vec![];
+        for (begin, end) in self {
+            if begin > end {
+                panic!("Invalid interval: {}-{}", begin, end)
+            }
+            vec.push(Interval(begin, end));
+        }
+        IntervalSet {
+            intervals: vec
+        }
     }
 }
 
 impl IntervalSet {
 
+    /// Function to create an empty interval set.
     pub fn empty() -> IntervalSet {
         IntervalSet{
             intervals: vec![]
         }
     }
 
-    pub fn from_vec(vec: Vec<Interval>) -> IntervalSet {
-        IntervalSet {
-            intervals: vec
-        }
+    /// Return `true` if the interval is empty.
+    pub fn is_empty(&self) -> bool {
+        self.intervals.len() == 0
     }
 
+    /// Return the union of two intervals.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    ///
+    /// let a = vec![(5, 10)].to_interval_set();
+    /// let b = vec![(15, 20)].to_interval_set();
+    /// a.union(b); // [5-10, 15-20]
+    /// ```
     pub fn union(self, rhs: IntervalSet) -> IntervalSet {
         self.merge(rhs, &|a, b| -> bool {a|b})
     }
 
+    /// Return the intersection of two intervals.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    ///
+    /// let a = vec![(5, 10)].to_interval_set();
+    /// let b = vec![(5, 10), (15, 20)].to_interval_set();
+    /// a.intersection(b); //[5-10]
+    /// ```
     pub fn intersection(self, rhs: IntervalSet) -> IntervalSet {
         self.merge(rhs, &|a, b| -> bool {a & b})
     }
 
+    /// Return the difference between two intervals.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    ///
+    /// let a = vec![(5, 10), (15, 20)].to_interval_set();
+    /// let b = vec![(5, 10)].to_interval_set();
+    /// a.difference(b); //[15-20]
+    /// ```
+    pub fn difference(self, rhs: IntervalSet) -> IntervalSet {
+        self.merge(rhs, &|a, b| -> bool {a & !b})
+    }
+
+    /// Return the symetric difference of two intervals.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    ///
+    /// let a = vec![(5, 10), (15, 20)].to_interval_set();
+    /// let b = vec![(0, 10)].to_interval_set();
+    /// a.difference(b); //[0-5, 15-20]
+    /// ```
+    pub fn symetric_difference(self, rhs: IntervalSet) -> IntervalSet {
+        self.merge(rhs, &|a, b| -> bool {a ^ b})
+    }
+
+    /// Generate the (flat) list of interval bounds of the requested merge.
+    /// The implementation is inspired by  http://stackoverflow.com/a/20062829.
     fn merge(self, rhs: IntervalSet, keep_operator: &Fn(bool, bool) -> bool ) -> IntervalSet {
+        if self.is_empty() & rhs.is_empty() {
+            return self
+        }
+
         let mut lflat = self.flatten();
         let mut rflat = rhs.flatten();
 
@@ -84,6 +246,9 @@ impl IntervalSet {
         IntervalSet::unflatten(res)
     }
 
+    /// Generate a vector of endpoints.
+    /// For example with the interval set `[0-5, 9-9,]`
+    /// The resulting array would be: [0, 5, 9]
     fn flatten(self) -> Vec<u32> {
         let mut res = vec![];
         for intv  in self.intervals {
@@ -92,17 +257,16 @@ impl IntervalSet {
         res
     }
 
+    /// From an array of endpoints generate an `IntervalSet`.
     fn unflatten(vec: Vec<u32>) -> IntervalSet {
-        println!("unflatten: {:?}", vec);
         let mut res :  Vec<Interval> = Vec::new();
         let mut i = 0;
         while i < vec.len() {
             res.push(Interval(vec[i], vec[i+1] - 1));
             i += 2;
         }
-        IntervalSet::from_vec(res)
+       res.to_interval_set()
     }
-
 }
 
 impl fmt::Display for Interval {
@@ -132,18 +296,17 @@ mod tests {
     }
 
     #[test]
-    fn test_from_vec() {
-        let from_vec = IntervalSet::from_vec(vec![Interval(0, 32)]);
-        let empty_from_vec = IntervalSet::from_vec(vec![]);
+    fn test_to_interval_set() {
+        let empty_from_vec: Vec<Interval> = vec![];
         let empty_set = IntervalSet::empty();
-        assert!(from_vec != empty_set);
-        assert!(empty_from_vec == empty_set);
+
+        assert!(empty_from_vec.to_interval_set() == empty_set);
     }
 
     #[test]
     fn test_flatten() {
-        let simple_range = IntervalSet::from_vec(vec![Interval(0, 10)]);
-        let disjoint = IntervalSet::from_vec(vec![Interval(0, 10), Interval(15, 20)]);
+        let simple_range = vec![Interval(0, 10)].to_interval_set();
+        let disjoint = vec![Interval(0, 10), Interval(15, 20)].to_interval_set();
         assert_eq!(simple_range.flatten(), vec![0, 11]);
         assert_eq!(disjoint.flatten(), vec![0, 11, 15, 21]);
     }
@@ -152,37 +315,95 @@ mod tests {
     fn test_unflatten() {
         let simple_range = vec![0, 11];
         let disjoint = vec![0, 11, 15, 21] ;
-        assert_eq!(IntervalSet::unflatten(disjoint), IntervalSet::from_vec(vec![Interval(0, 10), Interval(15, 20)]));
-        assert_eq!(IntervalSet::unflatten(simple_range), IntervalSet::from_vec(vec![Interval(0, 10)]));
+        assert_eq!(IntervalSet::unflatten(disjoint), vec![Interval(0, 10), Interval(15, 20)].to_interval_set());
+        assert_eq!(IntervalSet::unflatten(simple_range), vec![Interval(0, 10)].to_interval_set());
+    }
+
+    fn assert_difference(tes_id: u32, a: IntervalSet, b: IntervalSet, expected :IntervalSet) {
+        assert_eq!(a.difference(b), expected, "Test {} failed", tes_id);
     }
 
     #[test]
-    fn test_interval() {
-    }
-
-    #[test]
-    fn test_intersection() {
-        let sym_cases = vec![
-            (26, IntervalSet::from_vec(vec![Interval(5, 10)]), IntervalSet::from_vec(vec![Interval(5, 10), Interval(15, 20)]), IntervalSet::from_vec(vec![Interval(5, 10)]))
+    fn test_difference() {
+         let sym_cases: Vec<(u32, IntervalSet, IntervalSet, IntervalSet)> = vec![
+            (1, vec![Interval(5, 10)].to_interval_set(), vec![Interval(5, 10), Interval(15, 20)].to_interval_set(), IntervalSet::empty()),
+            (2, vec![(5, 10)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty()),
+            (3, IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty()),
+            (4, vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set()),
+            (5, vec![(0, 100)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(0, 4), (11, 14), (21, 100)].to_interval_set()),
+            (6, vec![(5, 10), (15, 20)].to_interval_set(), vec![(0, 100)].to_interval_set(), IntervalSet::empty()),
+            (7, IntervalSet::empty(), IntervalSet::empty(), IntervalSet::empty()),
         ];
 
         for (id, a, b, expected) in sym_cases {
             //assert_eq!(format!("test #{} of union", id), a, b, |x,y| x.union(y), expected);
-            assert_eq!(a.intersection(b), expected);
+           assert_difference(id , a, b, expected);
         }
+    }
+
+    fn assert_intersection(tes_id: u32, a: IntervalSet, b: IntervalSet, expected :IntervalSet) {
+        assert_eq!(a.intersection(b), expected, "Test {} failed", tes_id);
+    }
+
+    #[test]
+    fn test_intersection() {
+         let sym_cases: Vec<(u32, IntervalSet, IntervalSet, IntervalSet)> = vec![
+            (1, vec![Interval(5, 10)].to_interval_set(), vec![Interval(5, 10), Interval(15, 20)].to_interval_set(), vec![Interval(5, 10)].to_interval_set()),
+            (2, vec![(5, 10)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(5, 10)].to_interval_set()),
+            (3, IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty()),
+            (4, vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty(), IntervalSet::empty()),
+            (5, vec![(0, 100)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set()),
+            (6, IntervalSet::empty(), IntervalSet::empty(), IntervalSet::empty()),
+        ];
+
+        for (id, a, b, expected) in sym_cases {
+            //assert_eq!(format!("test #{} of union", id), a, b, |x,y| x.union(y), expected);
+           assert_intersection(id , a, b, expected);
+        }
+    }
+
+    fn assert_union(tes_id: u32, a: IntervalSet, b: IntervalSet, expected :IntervalSet) {
+        assert_eq!(a.union(b), expected, "Test {} failed", tes_id);
     }
 
     #[test]
     fn test_union() {
-    // Note: the first number is the test id, so it should be easy to identify which test has failed.
-    // The two first vectors are the operands and the expected result is last.
-    let sym_cases = vec![
-      (26, IntervalSet::from_vec(vec![Interval(5, 10)]), IntervalSet::from_vec(vec![Interval(5, 10), Interval(15, 20)]), IntervalSet::from_vec(vec![Interval(5, 10), Interval(15, 20)]))
-    ];
+        // Note: the first number is the test id, so it should be easy to identify which test has failed.
+        // The two first vectors are the operands and the expected result is last.
+        let sym_cases: Vec<(u32, IntervalSet, IntervalSet, IntervalSet)> = vec![
+            (1, vec![Interval(5, 10)].to_interval_set(), vec![Interval(5, 10), Interval(15, 20)].to_interval_set(), vec![Interval(5, 10), Interval(15, 20)].to_interval_set()),
+            (2, vec![(5, 10)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set()),
+            (3, IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set()),
+            (4, vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set()),
+            (5, vec![(0, 100)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(0, 100)].to_interval_set()),
+            (6, IntervalSet::empty(), IntervalSet::empty(), IntervalSet::empty()),
+        ];
 
-    for (id, a, b, expected) in sym_cases {
-      //assert_eq!(format!("test #{} of union", id), a, b, |x,y| x.union(y), expected);
-      assert_eq!(a.union(b), expected);
+        for (id, a, b, expected) in sym_cases {
+            //assert_eq!(format!("test #{} of union", id), a, b, |x,y| x.union(y), expected);
+            assert_union(id, a, b, expected);
+        }
     }
-  }
+
+    fn assert_symetric_difference(tes_id: u32, a: IntervalSet, b: IntervalSet, expected :IntervalSet) {
+        assert_eq!(a.symetric_difference(b), expected, "Test {} failed", tes_id);
+    }
+
+    #[test]
+    fn test_symetric_difference() {
+         let sym_cases: Vec<(u32, IntervalSet, IntervalSet, IntervalSet)> = vec![
+            (1, vec![Interval(5, 10)].to_interval_set(), vec![Interval(5, 10), Interval(15, 20)].to_interval_set(), vec![(15, 20)].to_interval_set()),
+            (2, vec![(5, 10)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(15, 20)].to_interval_set()),
+            (3, IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set()),
+            (4, vec![(5, 10), (15, 20)].to_interval_set(), IntervalSet::empty(), vec![(5, 10), (15, 20)].to_interval_set()),
+            (5, vec![(0, 100)].to_interval_set(), vec![(5, 10), (15, 20)].to_interval_set(), vec![(0, 4), (11, 14), (21, 100)].to_interval_set()),
+            (6, vec![(5, 10), (15, 20)].to_interval_set(), vec![(0, 100)].to_interval_set(), vec![(0, 4), (11, 14), (21, 100)].to_interval_set()),
+            (7, IntervalSet::empty(), IntervalSet::empty(), IntervalSet::empty()),
+        ];
+
+        for (id, a, b, expected) in sym_cases {
+            //assert_eq!(format!("test #{} of union", id), a, b, |x,y| x.union(y), expected);
+           assert_symetric_difference(id , a, b, expected);
+        }
+    }
 }
