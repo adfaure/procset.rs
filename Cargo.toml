@@ -6,5 +6,3 @@ authors = ["adfaure <adrien.faure2@gmail.com>"]
 [lib]
 name = "interval_set"
 path = "src/libinterval_set/lib.rs"
-
-[dependencies]
