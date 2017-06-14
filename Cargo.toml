@@ -3,6 +3,12 @@ name = "interval_set"
 version = "0.1.0"
 authors = ["adfaure <adrien.faure2@gmail.com>"]
 readme = "README.md"
+documentation = ""
+homepage = "https://gitlab.inria.fr/adfaure/procset.rs"
+license = "MIT"
+description = """
+  Toolkit to manage sets of closed intervals.
+"""
 
 [lib]
 name = "interval_set"
