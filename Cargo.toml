@@ -1,9 +1,9 @@
 [package]
-name = "interval_set"
+name = "procset"
 version = "0.1.0"
 authors = ["adfaure <adrien.faure2@gmail.com>"]
 readme = "README.md"
-documentation = ""
+documentation = "https://gitlab.inria.fr/adfaure/procset.rs"
 homepage = "https://gitlab.inria.fr/adfaure/procset.rs"
 license = "MIT"
 description = """
