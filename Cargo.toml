@@ -2,6 +2,7 @@
 name = "interval_set"
 version = "0.1.0"
 authors = ["adfaure <adrien.faure2@gmail.com>"]
+readme = "README.md"
 
 [lib]
 name = "interval_set"
