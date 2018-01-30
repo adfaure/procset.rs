@@ -1,6 +1,8 @@
 use std::fmt;
 use std::cmp;
 
+use std::str::FromStr;
+
 /// Struct `Interval` containing two values representing the limit of the interval.
 ///
 /// The `Interval` is incluse which means that `Interval(0, 10)` is [0, 10].
@@ -153,6 +155,58 @@ impl ToIntervalSet for Vec<(u32, u32)> {
             res.insert(Interval(begin, end));
         }
         res
+    }
+}
+
+impl ToIntervalSet for String {
+    /// Convert a string formatted into an
+    /// interval set.
+    /// The rules are simple for the string to be
+    /// valid.
+    /// - Each intervals are separated by a space.
+    /// - Each bounds of the interval are separated by
+    ///   a dash(-).
+    /// - If an interval is of size 1, it is sufficient to
+    ///   write only one integer.
+    /// # Example
+    /// ```
+    /// use interval_set::interval_set::ToIntervalSet;
+    /// use interval_set::Interval;
+    /// let interval = String::from("3-4 7-19").to_interval_set();
+    /// assert_eq!(interval, vec![(3, 4), (7, 19)].to_interval_set());
+    ///
+    /// let interval = String::from("3-4 6 7-19").to_interval_set();
+    /// assert_eq!(interval, vec![(3, 4), (6, 6) ,(7, 19)].to_interval_set());
+    ///
+    ///
+    /// let interval = String::from("3-4 7-19 6").to_interval_set();
+    /// assert_eq!(interval, vec![(3, 4), (6, 6), (7, 19)].to_interval_set());
+    ///
+    ///
+    /// let interval = String::from("3-4 7-19 6").to_interval_set();
+    /// let interval_bis = String::from("3-3 4 7-7 8 9-19 6").to_interval_set();
+    /// assert_eq!(interval, interval_bis);
+    ///
+    /// ```
+    fn to_interval_set(self) -> IntervalSet {
+        let mut iter = self.split_whitespace();
+        let mut result = IntervalSet::empty();
+        for interval in iter {
+            // Handles the case where we have two specified bounds.
+            if interval.contains("-") {
+                // split by - and use map to transform the string into u32
+                let bounds: Vec<u32> =
+                    interval.split('-').map(|b| u32::from_str(b).unwrap()
+                                            ).collect();
+
+                let interval = Interval::new(bounds[0], bounds[1]);
+                result = result.union(interval.to_interval_set());
+            } else {
+                let bound = u32::from_str(interval).unwrap();
+                result = result.union(Interval::new(bound, bound).to_interval_set());
+            }
+        }
+        result
     }
 }
 

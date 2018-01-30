@@ -1,6 +1,6 @@
 [package]
 name = "procset"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["adfaure <adrien.faure2@gmail.com>"]
 readme = "README.md"
 documentation = "https://adfaure.github.io/procset.rs/interval_set/"
